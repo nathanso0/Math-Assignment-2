@@ -1,59 +1,63 @@
-local level = require("level")
-local Enemy = require("enemy")
+-- main.lua
+love.window.setTitle("Assignment 2 Prototype")
+
 local Player = require("player")
+local Level  = require("level")
+local Enemy  = require("enemy")
 
-local enemies = {}
-local debug = true
-local player
-
-local cam = {x = 0, y = 0}
+local level, player, enemies
 
 function love.load()
     math.randomseed(os.time())
-    level.init()
 
-    -- spawn player in air so they must land/jump onto the start platform
-    player = Player.new(40, 440)
+    level = Level.new()
+    player = Player.new(120, 300)
 
-    -- enemies: 1 before ascent, 1 on top platform, 1 after descent
-    table.insert(enemies, Enemy.new(120, 480 - 16))   -- before ascent
-    table.insert(enemies, Enemy.new(700, 260 - 16))   -- top platform
-    table.insert(enemies, Enemy.new(1130, 480 - 16))  -- after descent
+    enemies = {
+        Enemy.new(500, 220),
+        Enemy.new(300, 400)
+    }
 end
 
 function love.update(dt)
-    player:update(dt, level)
+    player:update(dt, level, enemies)
 
-    local pstate = { x = player.x, y = player.y }
-    for _, enemy in ipairs(enemies) do
-        enemy:update(dt, pstate, level)
+    for _, e in ipairs(enemies) do
+        e:update(dt, player, level)
     end
-
-    local winW, winH = love.graphics.getWidth(), love.graphics.getHeight()
-    cam.x = player.x - winW * 0.5
-    cam.y = player.y - winH * 0.5
-    cam.x = math.max(0, math.min(cam.x, (level.width or winW) - winW))
-    cam.y = math.max(0, math.min(cam.y, (level.height or winH) - winH))
 end
 
 function love.draw()
-    love.graphics.clear(0.09, 0.11, 0.14)
+    level:draw()
 
-    love.graphics.push()
-    love.graphics.translate(-math.floor(cam.x), -math.floor(cam.y))
-
-    level.draw()
-    for _, e in ipairs(enemies) do e:draw() end
-    player:draw()
-
-    love.graphics.pop()
-
-    if debug then
-        love.graphics.setColor(1,1,1)
-        love.graphics.print("Move: WASD/Arrows. Jump: Space. Dash: Shift + Left/Right", 10, 10)
+    for _, e in ipairs(enemies) do
+        e:draw()
     end
+
+    player:draw()
 end
 
 function love.keypressed(key)
-    if key == "d" then debug = not debug end
+    if key == "space" then player:jump() end
+
+    -- Celeste dash: Shift + direction
+    if key == "lshift" or key == "rshift" then
+        local dirx = 0
+        if love.keyboard.isDown("a", "left") then dirx = -1 end
+        if love.keyboard.isDown("d", "right") then dirx = 1 end
+        player:dash(dirx, 0)
+    end
+
+    if key == "e" then player:shootBullet() end
+    if key == "r" or key == "m" then player:shootMissile() end
+
+    -- Raycast Target ability
+    if key == "t" then
+        local mx, my = love.mouse.getPosition()
+        player:raycastTo(mx, my, level, enemies)
+    end
+end
+
+function love.keyreleased(key)
+    if key == "space" then player:shortHopRelease() end
 end
